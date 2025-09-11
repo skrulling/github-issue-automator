@@ -3,6 +3,7 @@
 import time
 import logging
 import schedule
+import subprocess
 from typing import Set
 
 from config import Config
@@ -94,6 +95,65 @@ def process_new_issues():
     except Exception as e:
         logger.error(f"Error in process_new_issues: {e}")
 
+def check_claude_authentication():
+    """Check if Claude Code is authenticated, attempt login if not"""
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # First check if already authenticated
+        result = subprocess.run(['claude', 'auth', 'status'], 
+                              capture_output=True, text=True, timeout=30)
+        
+        if result.returncode == 0:
+            logger.info("✅ Claude Code is already authenticated")
+            return True
+        else:
+            logger.info("❌ Claude Code not authenticated, attempting login...")
+            
+            # Attempt interactive login (will output URL to logs)
+            logger.info("🔗 Starting Claude Code authentication process...")
+            logger.info("📋 Please check the logs below for the authentication URL")
+            logger.info("=" * 60)
+            
+            # Start the login process
+            login_process = subprocess.Popen(
+                ['claude', 'auth', 'login'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                universal_newlines=True
+            )
+            
+            # Read output line by line and log it
+            for line in iter(login_process.stdout.readline, ''):
+                if line.strip():
+                    logger.info(f"CLAUDE AUTH: {line.strip()}")
+                    
+                    # Look for authentication URL
+                    if "http" in line.lower() and ("claude.ai" in line.lower() or "anthropic" in line.lower()):
+                        logger.info("🔥 AUTHENTICATION URL FOUND ABOVE! 🔥")
+                        logger.info("👆 Copy the URL from the line above and open it in your browser")
+                
+            login_process.wait(timeout=300)  # Wait up to 5 minutes
+            
+            if login_process.returncode == 0:
+                logger.info("✅ Claude Code authentication completed successfully!")
+                return True
+            else:
+                logger.error("❌ Claude Code authentication failed")
+                return False
+                
+    except subprocess.TimeoutExpired:
+        logger.error("⏰ Claude Code authentication timed out")
+        return False
+    except FileNotFoundError:
+        logger.error("❌ Claude Code CLI not found. Please install it first.")
+        return False
+    except Exception as e:
+        logger.error(f"❌ Error during Claude Code authentication: {e}")
+        return False
+
 def main():
     """Main application entry point"""
     try:
@@ -106,6 +166,14 @@ def main():
         
         # Start health check server
         start_health_server()
+        
+        # Check Claude Code authentication
+        logger.info("🔐 Checking Claude Code authentication...")
+        claude_authenticated = check_claude_authentication()
+        
+        if not claude_authenticated:
+            logger.warning("⚠️  Claude Code not authenticated. Issue processing will fail until authenticated.")
+            logger.info("💡 Check the logs above for authentication URL, or restart the service after authentication")
         
         logger.info(f"Monitoring repo: {Config.REPO_OWNER}/{Config.REPO_NAME}")
         logger.info(f"Target user: {Config.TARGET_USER}")
