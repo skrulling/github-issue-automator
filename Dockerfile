@@ -4,6 +4,8 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y \
     git \
     curl \
+    wget \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install GitHub CLI
@@ -13,8 +15,17 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
     && apt-get update \
     && apt-get install gh -y
 
-# Install Claude Code CLI
-RUN curl -fsSL https://claude.ai/download/cli/install.sh | bash || echo "Claude Code will need manual installation"
+# Install Claude Code CLI (using npm for more reliable container installation)
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install -g @anthropic-ai/claude-code \
+    || (echo "Trying alternative Claude Code installation..." \
+        && curl -fsSL https://claude.ai/download/cli/linux-x64 -o /tmp/claude \
+        && chmod +x /tmp/claude \
+        && mv /tmp/claude /usr/local/bin/claude)
+
+# Verify Claude Code installation
+RUN claude --version || echo "Claude Code installation verification failed - will attempt runtime installation"
 
 # Set working directory
 WORKDIR /app
