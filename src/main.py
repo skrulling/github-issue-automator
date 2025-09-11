@@ -9,6 +9,7 @@ from config import Config
 from logger import setup_logging
 from github_client import GitHubClient
 from claude_executor import ClaudeExecutor
+from health_server import start_health_server
 
 # Track processed issues to avoid duplicates
 processed_issues: Set[int] = set()
@@ -102,6 +103,10 @@ def main():
         # Setup logging
         logger = setup_logging(Config.LOG_LEVEL, Config.LOG_FILE)
         logger.info("GitHub Issue Automator starting...")
+        
+        # Start health check server
+        start_health_server()
+        
         logger.info(f"Monitoring repo: {Config.REPO_OWNER}/{Config.REPO_NAME}")
         logger.info(f"Target user: {Config.TARGET_USER}")
         logger.info(f"Poll interval: {Config.POLL_INTERVAL_MINUTES} minutes")
