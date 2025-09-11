@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  github-automator:
+    build: .
+    container_name: github-issue-automator
+    restart: unless-stopped
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - REPO_OWNER=${REPO_OWNER}
+      - REPO_NAME=${REPO_NAME}
+      - TARGET_USER=${TARGET_USER}
+      - POLL_INTERVAL_MINUTES=${POLL_INTERVAL_MINUTES:-5}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./logs:/app/logs
+      - ./config:/app/config
+      # Mount .env file if it exists
+      - ./.env:/app/.env:ro
+    # If you need to persist Git credentials or Claude Code authentication
+    # - ~/.gitconfig:/root/.gitconfig:ro
+    # - ~/.claude:/root/.claude:ro
