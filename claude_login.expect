@@ -1,0 +1,43 @@
+#!/usr/bin/expect -f
+
+# Set timeout
+set timeout 60
+
+# Start claude
+spawn claude
+
+# Wait for prompt and send /login
+expect {
+    ">" {
+        send "/login\r"
+        exp_continue
+    }
+    "http*" {
+        # Found URL, print it clearly
+        puts "\n🔥🔥🔥 AUTHENTICATION URL FOUND 🔥🔥🔥"
+        puts $expect_out(0,string)
+        puts "👆 Copy the URL above and open it in your browser"
+        puts "🔄 After completing authentication, restart the Railway service"
+        puts "🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥"
+        exp_continue
+    }
+    "success*" {
+        puts "✅ Authentication successful!"
+        exit 0
+    }
+    "authenticated*" {
+        puts "✅ Authentication successful!"
+        exit 0
+    }
+    timeout {
+        puts "⏰ Authentication timed out"
+        exit 1
+    }
+    eof {
+        puts "❌ Claude process ended"
+        exit 1
+    }
+}
+
+# Keep the script running to capture all output
+interact

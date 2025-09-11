@@ -110,89 +110,45 @@ def check_claude_authentication():
         else:
             logger.info("❌ Claude Code not authenticated, attempting login...")
             
-            # Start Claude in interactive mode and send /login command
-            logger.info("🔗 Starting Claude Code in interactive mode...")
+            # Use expect script to handle Claude interactive authentication
+            logger.info("🔗 Starting Claude Code authentication using expect script...")
             logger.info("📋 Please check the logs below for the authentication URL")
             logger.info("=" * 60)
             
-            # Set up environment for interactive mode
-            import os
-            env = os.environ.copy()
-            env['TERM'] = 'xterm-256color'
-            
-            # Start Claude in interactive mode
-            claude_process = subprocess.Popen(
-                ['claude'],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                universal_newlines=True,
-                env=env
-            )
-            
-            # Wait a moment for Claude to start up
-            import time
-            time.sleep(2)
-            
-            # Send the /login command
-            logger.info("CLAUDE AUTH: Sending /login command...")
             try:
-                claude_process.stdin.write('/login\n')
-                claude_process.stdin.flush()
-                time.sleep(1)
+                # Run the expect script
+                result = subprocess.run(
+                    ['./claude_login.expect'],
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                    cwd='/app'
+                )
+                
+                # Log all output from expect script
+                if result.stdout:
+                    for line in result.stdout.split('\n'):
+                        if line.strip():
+                            logger.info(f"CLAUDE AUTH: {line}")
+                
+                if result.stderr:
+                    for line in result.stderr.split('\n'):
+                        if line.strip():
+                            logger.info(f"CLAUDE AUTH ERROR: {line}")
+                
+                # Check return code
+                if result.returncode == 0:
+                    logger.info("✅ Claude Code authentication completed successfully!")
+                    return True
+                else:
+                    logger.error(f"❌ Claude Code authentication failed with exit code: {result.returncode}")
+                    return False
+                    
+            except subprocess.TimeoutExpired:
+                logger.error("⏰ Claude authentication script timed out")
+                return False
             except Exception as e:
-                logger.error(f"Error sending /login command: {e}")
-            
-            # Read output and look for authentication URL
-            output_lines = []
-            timeout_start = time.time()
-            timeout_duration = 60  # 60 seconds timeout
-            
-            while time.time() - timeout_start < timeout_duration:
-                try:
-                    # Check if process is still running and has output
-                    if claude_process.poll() is None:
-                        line = claude_process.stdout.readline()
-                        if line:
-                            line = line.strip()
-                            if line:
-                                output_lines.append(line)
-                                logger.info(f"CLAUDE AUTH: {line}")
-                                
-                                # Look for authentication URL
-                                if "http" in line.lower() and ("claude.ai" in line.lower() or "anthropic" in line.lower() or "localhost" in line.lower()):
-                                    logger.info("🔥 AUTHENTICATION URL FOUND ABOVE! 🔥")
-                                    logger.info("👆 Copy the URL from the line above and open it in your browser")
-                                    logger.info("🔄 After completing authentication in browser, restart this Railway service")
-                                    break
-                                
-                                # Look for success message
-                                if "success" in line.lower() or "authenticated" in line.lower():
-                                    logger.info("✅ Authentication appears successful!")
-                                    break
-                    else:
-                        break
-                        
-                    time.sleep(0.5)
-                except Exception as e:
-                    logger.error(f"Error reading Claude output: {e}")
-                    break
-            
-            # Clean up process
-            try:
-                claude_process.terminate()
-                claude_process.wait(timeout=5)
-            except:
-                claude_process.kill()
-            
-            # Check if we got any authentication success indicators
-            if any("success" in line.lower() or "authenticated" in line.lower() for line in output_lines):
-                logger.info("✅ Claude Code authentication completed successfully!")
-                return True
-            else:
-                logger.error("❌ Claude Code authentication failed or timed out")
+                logger.error(f"❌ Error running authentication script: {e}")
                 return False
                 
     except subprocess.TimeoutExpired:
