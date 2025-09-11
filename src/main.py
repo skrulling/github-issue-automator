@@ -115,25 +115,42 @@ def check_claude_authentication():
             logger.info("📋 Please check the logs below for the authentication URL")
             logger.info("=" * 60)
             
-            # Start the login process
+            # Try to start interactive login with explicit TTY settings
+            import os
+            env = os.environ.copy()
+            env['TERM'] = 'xterm-256color'
+            
+            # Start the login process with pseudo-terminal
             login_process = subprocess.Popen(
-                ['claude', 'auth', 'login'],
+                ['claude', 'auth', 'login', '--no-browser'],
+                stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
-                universal_newlines=True
+                universal_newlines=True,
+                env=env
             )
             
+            # Send enter/newline to progress through any prompts
+            try:
+                login_process.stdin.write('\n')
+                login_process.stdin.flush()
+            except:
+                pass
+            
             # Read output line by line and log it
+            output_lines = []
             for line in iter(login_process.stdout.readline, ''):
                 if line.strip():
+                    output_lines.append(line.strip())
                     logger.info(f"CLAUDE AUTH: {line.strip()}")
                     
                     # Look for authentication URL
-                    if "http" in line.lower() and ("claude.ai" in line.lower() or "anthropic" in line.lower()):
+                    if "http" in line.lower() and ("claude.ai" in line.lower() or "anthropic" in line.lower() or "localhost" in line.lower()):
                         logger.info("🔥 AUTHENTICATION URL FOUND ABOVE! 🔥")
                         logger.info("👆 Copy the URL from the line above and open it in your browser")
+                        logger.info("🔄 After completing authentication in browser, restart this Railway service")
                 
             login_process.wait(timeout=300)  # Wait up to 5 minutes
             
