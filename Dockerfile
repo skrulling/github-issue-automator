@@ -38,8 +38,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ ./src/
 COPY .env* ./
 
-# Create logs and data directories
-RUN mkdir -p logs data
+# Create logs, data, and repo directories
+RUN mkdir -p logs data repo
 
 # Set environment variables
 ENV PYTHONPATH=/app

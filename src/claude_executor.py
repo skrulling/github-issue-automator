@@ -1,95 +1,62 @@
 import os
 import subprocess
 import logging
-import tempfile
-import shutil
 import json
 from typing import Optional, Tuple
+from repo_manager import RepositoryManager
 
 logger = logging.getLogger(__name__)
 
 class ClaudeExecutor:
-    def __init__(self, work_dir: str = None):
-        self.work_dir = work_dir or tempfile.mkdtemp(prefix='claude_automation_')
+    def __init__(self, repo_manager: RepositoryManager):
+        self.repo_manager = repo_manager
         
     def execute_issue_fix(self, repo_url: str, issue_number: int, issue_title: str, issue_body: str) -> Tuple[bool, str]:
         """
-        Execute Claude Code to fix an issue:
-        1. Clone repo to new branch
-        2. Ask Claude to fix the issue
+        Execute Claude Code to fix an issue using persistent repository:
+        1. Prepare repo for issue (sync and create branch)
+        2. Ask Claude to fix the issue in the repo directory
         3. Create PR
         """
         try:
-            # Create a temporary directory for this specific issue
-            issue_work_dir = os.path.join(self.work_dir, f"issue_{issue_number}")
-            os.makedirs(issue_work_dir, exist_ok=True)
+            # Prepare repository for this issue
+            prep_success, prep_msg = self.repo_manager.prepare_for_issue(issue_number)
+            if not prep_success:
+                return False, f"Failed to prepare repository: {prep_msg}"
             
-            # Clone the repository
-            clone_success, clone_msg = self._clone_repo(repo_url, issue_work_dir)
-            if not clone_success:
-                return False, f"Failed to clone repository: {clone_msg}"
+            logger.info(f"Repository prepared: {prep_msg}")
             
-            # Change to repo directory
-            repo_name = repo_url.split('/')[-1].replace('.git', '')
-            repo_path = os.path.join(issue_work_dir, repo_name)
-            
-            # Create and checkout new branch
-            branch_name = f"fix-issue-{issue_number}"
-            branch_success, branch_msg = self._create_branch(repo_path, branch_name)
-            if not branch_success:
-                return False, f"Failed to create branch: {branch_msg}"
+            # Get repository directory
+            repo_path = self.repo_manager.get_repo_directory()
             
             # Execute Claude Code to fix the issue
             fix_prompt = self._build_fix_prompt(issue_number, issue_title, issue_body)
             fix_success, fix_msg = self._run_claude_code(repo_path, fix_prompt)
+            
             if not fix_success:
+                # Clean up on failure
+                self.repo_manager.cleanup_after_issue(success=False)
                 return False, f"Claude Code execution failed: {fix_msg}"
             
             # Create PR
+            branch_name = f"fix-issue-{issue_number}"
             pr_success, pr_msg = self._create_pr(repo_path, branch_name, issue_number, issue_title)
+            
             if not pr_success:
+                # Clean up on PR failure
+                self.repo_manager.cleanup_after_issue(success=False)
                 return False, f"Failed to create PR: {pr_msg}"
             
+            # Clean up on success (but keep the branch since PR was created)
+            self.repo_manager.cleanup_after_issue(success=True)
             return True, f"Successfully processed issue #{issue_number}. {pr_msg}"
             
         except Exception as e:
             logger.error(f"Error executing issue fix: {e}")
-            return False, str(e)
-        finally:
-            # Cleanup
-            if os.path.exists(issue_work_dir):
-                shutil.rmtree(issue_work_dir, ignore_errors=True)
-    
-    def _clone_repo(self, repo_url: str, work_dir: str) -> Tuple[bool, str]:
-        """Clone repository"""
-        try:
-            cmd = ['git', 'clone', repo_url]
-            result = subprocess.run(cmd, cwd=work_dir, capture_output=True, text=True, timeout=300)
-            
-            if result.returncode == 0:
-                return True, "Repository cloned successfully"
-            else:
-                return False, result.stderr
-                
-        except subprocess.TimeoutExpired:
-            return False, "Clone operation timed out"
-        except Exception as e:
+            # Clean up on exception
+            self.repo_manager.cleanup_after_issue(success=False)
             return False, str(e)
     
-    def _create_branch(self, repo_path: str, branch_name: str) -> Tuple[bool, str]:
-        """Create and checkout new branch"""
-        try:
-            # Create and checkout branch
-            cmd = ['git', 'checkout', '-b', branch_name]
-            result = subprocess.run(cmd, cwd=repo_path, capture_output=True, text=True)
-            
-            if result.returncode == 0:
-                return True, f"Created branch {branch_name}"
-            else:
-                return False, result.stderr
-                
-        except Exception as e:
-            return False, str(e)
     
     def _build_fix_prompt(self, issue_number: int, issue_title: str, issue_body: str) -> str:
         """Build intelligent system prompt for Claude Code with comprehensive project analysis"""
@@ -262,7 +229,3 @@ Your goal is to deliver production-quality code that seamlessly integrates with 
         except Exception as e:
             return False, str(e)
     
-    def cleanup(self):
-        """Clean up work directory"""
-        if os.path.exists(self.work_dir):
-            shutil.rmtree(self.work_dir, ignore_errors=True)

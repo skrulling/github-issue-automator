@@ -11,9 +11,11 @@ from github_client import GitHubClient
 from claude_executor import ClaudeExecutor
 from health_server import start_health_server
 from issue_tracker import IssueTracker
+from repo_manager import RepositoryManager
 
-# Initialize issue tracker
+# Initialize issue tracker and repository manager
 issue_tracker = IssueTracker()
+repo_manager = None  # Will be initialized in main()
 
 def process_new_issues():
     """Main function to check for and process new issues"""
@@ -27,7 +29,13 @@ def process_new_issues():
             repo_name=Config.REPO_NAME
         )
         
-        claude_executor = ClaudeExecutor()
+        # Use global repo_manager
+        global repo_manager
+        if not repo_manager:
+            logger.error("Repository manager not initialized")
+            return
+            
+        claude_executor = ClaudeExecutor(repo_manager)
         
         # Get unprocessed issues by target user
         unprocessed_issues = github_client.get_unprocessed_issues_by_user(
@@ -108,9 +116,6 @@ def process_new_issues():
                 # Mark as failed with exponential backoff
                 issue_tracker.mark_failed(issue.number)
         
-        # Cleanup
-        claude_executor.cleanup()
-        
     except Exception as e:
         logger.error(f"Error in process_new_issues: {e}")
 
@@ -180,6 +185,18 @@ def main():
         
         # Start health check server
         start_health_server()
+        
+        # Initialize repository manager
+        logger.info("📁 Initializing repository manager...")
+        global repo_manager
+        repo_manager = RepositoryManager(Config.get_repo_url())
+        
+        repo_init_success, repo_init_msg = repo_manager.initialize_repo()
+        if not repo_init_success:
+            logger.error(f"Failed to initialize repository: {repo_init_msg}")
+            raise RuntimeError(f"Repository initialization failed: {repo_init_msg}")
+        
+        logger.info(f"Repository initialized: {repo_init_msg}")
         
         # Check Claude Code authentication
         logger.info("🔐 Checking Claude Code authentication...")
