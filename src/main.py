@@ -36,7 +36,7 @@ def process_new_issues():
         )
         
         if not recent_issues:
-            logger.info("No new issues found")
+            logger.info(f"No new issues found by user '{Config.TARGET_USER}' in the last {Config.POLL_INTERVAL_MINUTES} minutes")
             return
         
         logger.info(f"Found {len(recent_issues)} recent issues")
