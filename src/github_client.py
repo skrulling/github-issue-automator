@@ -14,49 +14,44 @@ class GitHubClient:
         self.repo_owner = repo_owner
         self.repo_name = repo_name
         
-    def get_recent_issues_by_user(self, username: str, minutes_back: int = 5) -> List[Issue]:
-        """Get issues created by a specific user in the last N minutes"""
+    def get_unprocessed_issues_by_user(self, username: str, processed_issues: set) -> List[Issue]:
+        """Get unprocessed open issues created by a specific user"""
         try:
-            cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=minutes_back)
-            
-            # Get recent issues
+            # Get open issues by the target user
             issues = self.repo.get_issues(
                 state='open',
+                creator=username,
                 sort='created',
                 direction='desc'
             )
             
-            recent_issues = []
+            unprocessed_issues = []
             issue_count = 0
             
             for issue in issues:
                 issue_count += 1
-                logger.debug(f"Checking issue #{issue.number}: {issue.title} by {issue.user.login}")
-                logger.debug(f"Issue created at: {issue.created_at}, Cutoff: {cutoff_time}")
                 
-                # Ensure both datetimes are timezone-aware for comparison
-                issue_created_at = issue.created_at
-                if issue_created_at.tzinfo is None:
-                    issue_created_at = issue_created_at.replace(tzinfo=timezone.utc)
+                # Skip pull requests
+                if issue.pull_request:
+                    logger.debug(f"Skipping PR #{issue.number}")
+                    continue
                 
-                # Check if issue is recent and by target user
-                if (issue_created_at >= cutoff_time and 
-                    issue.user.login == username and
-                    not issue.pull_request):  # Exclude PRs
-                    recent_issues.append(issue)
-                    logger.info(f"Found new issue #{issue.number}: {issue.title} by {issue.user.login}")
-                elif issue_created_at < cutoff_time:
-                    # Issues are sorted by creation date, so we can break early
-                    logger.debug(f"Issue #{issue.number} is older than cutoff, stopping search")
-                    break
-                    
+                # Check if already processed
+                if issue.number in processed_issues:
+                    logger.debug(f"Issue #{issue.number} already processed, skipping")
+                    continue
+                
+                # This is an unprocessed issue by the target user
+                unprocessed_issues.append(issue)
+                logger.info(f"Found unprocessed issue #{issue.number}: {issue.title} by {issue.user.login}")
+                
                 # Limit to checking first 50 issues to avoid API rate limits
                 if issue_count >= 50:
                     logger.info("Checked 50 issues, stopping to avoid rate limits")
                     break
             
-            logger.info(f"Checked {issue_count} issues, found {len(recent_issues)} by user '{username}' in last {minutes_back} minutes")
-            return recent_issues
+            logger.info(f"Checked {issue_count} issues, found {len(unprocessed_issues)} unprocessed issues by user '{username}'")
+            return unprocessed_issues
             
         except Exception as e:
             logger.error(f"Error fetching issues: {e}")

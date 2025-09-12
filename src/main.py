@@ -4,16 +4,16 @@ import time
 import logging
 import schedule
 import subprocess
-from typing import Set
 
 from config import Config
 from logger import setup_logging
 from github_client import GitHubClient
 from claude_executor import ClaudeExecutor
 from health_server import start_health_server
+from issue_tracker import IssueTracker
 
-# Track processed issues to avoid duplicates
-processed_issues: Set[int] = set()
+# Initialize issue tracker
+issue_tracker = IssueTracker()
 
 def process_new_issues():
     """Main function to check for and process new issues"""
@@ -29,24 +29,20 @@ def process_new_issues():
         
         claude_executor = ClaudeExecutor()
         
-        # Get recent issues by target user
-        recent_issues = github_client.get_recent_issues_by_user(
+        # Get unprocessed issues by target user
+        unprocessed_issues = github_client.get_unprocessed_issues_by_user(
             username=Config.TARGET_USER,
-            minutes_back=Config.POLL_INTERVAL_MINUTES
+            processed_issues=issue_tracker.processed_issues
         )
         
-        if not recent_issues:
-            logger.info(f"No new issues found by user '{Config.TARGET_USER}' in the last {Config.POLL_INTERVAL_MINUTES} minutes")
+        if not unprocessed_issues:
+            logger.info(f"No unprocessed issues found by user '{Config.TARGET_USER}'")
             return
         
-        logger.info(f"Found {len(recent_issues)} recent issues")
+        logger.info(f"Found {len(unprocessed_issues)} unprocessed issues")
         
-        # Process each new issue
-        for issue in recent_issues:
-            if issue.number in processed_issues:
-                logger.info(f"Issue #{issue.number} already processed, skipping")
-                continue
-            
+        # Process each unprocessed issue
+        for issue in unprocessed_issues:
             logger.info(f"Processing issue #{issue.number}: {issue.title}")
             
             # Add comment to issue indicating we're working on it
@@ -87,7 +83,7 @@ def process_new_issues():
                 )
             
             # Mark as processed regardless of success/failure
-            processed_issues.add(issue.number)
+            issue_tracker.mark_processed(issue.number)
         
         # Cleanup
         claude_executor.cleanup()
@@ -175,9 +171,13 @@ def main():
         logger.info(f"Monitoring repo: {Config.REPO_OWNER}/{Config.REPO_NAME}")
         logger.info(f"Target user: {Config.TARGET_USER}")
         logger.info(f"Poll interval: {Config.POLL_INTERVAL_MINUTES} minutes")
+        logger.info(f"Currently tracking {issue_tracker.get_processed_count()} processed issues")
         
         # Schedule the job
         schedule.every(Config.POLL_INTERVAL_MINUTES).minutes.do(process_new_issues)
+        
+        # Schedule daily cleanup of old processed issues
+        schedule.every().day.at("02:00").do(lambda: issue_tracker.cleanup_old_issues())
         
         # Run initial check
         logger.info("Running initial issue check...")
