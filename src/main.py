@@ -189,7 +189,7 @@ def main():
         # Initialize repository manager
         logger.info("📁 Initializing repository manager...")
         global repo_manager
-        repo_manager = RepositoryManager(Config.get_repo_url())
+        repo_manager = RepositoryManager(Config.get_repo_url(), Config.GITHUB_TOKEN)
         
         repo_init_success, repo_init_msg = repo_manager.initialize_repo()
         if not repo_init_success:

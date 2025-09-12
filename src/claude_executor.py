@@ -207,6 +207,15 @@ Your goal is to deliver production-quality code that seamlessly integrates with 
     def _create_pr(self, repo_path: str, branch_name: str, issue_number: int, issue_title: str) -> Tuple[bool, str]:
         """Push branch and create PR"""
         try:
+            # Ensure we have commits to push
+            status_result = subprocess.run(['git', 'status', '--porcelain'], cwd=repo_path, capture_output=True, text=True)
+            commit_result = subprocess.run(['git', 'log', '--oneline', f'origin/main..{branch_name}'], cwd=repo_path, capture_output=True, text=True)
+            
+            if not commit_result.stdout.strip():
+                return False, "No commits found on branch - Claude Code may not have made any changes"
+            
+            logger.info(f"Found commits to push: {len(commit_result.stdout.strip().split())}")
+            
             # Push branch
             push_cmd = ['git', 'push', '-u', 'origin', branch_name]
             push_result = subprocess.run(push_cmd, cwd=repo_path, capture_output=True, text=True)

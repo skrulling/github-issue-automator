@@ -10,10 +10,21 @@ logger = logging.getLogger(__name__)
 class RepositoryManager:
     """Manage persistent repository for issue processing"""
     
-    def __init__(self, repo_url: str, repo_dir: str = "/app/repo"):
+    def __init__(self, repo_url: str, github_token: str, repo_dir: str = "/app/repo"):
         self.repo_url = repo_url
+        self.github_token = github_token
         self.repo_dir = Path(repo_dir)
         self.current_branch = None
+        
+        # Convert HTTPS URL to use token authentication
+        self.auth_repo_url = self._get_authenticated_url(repo_url, github_token)
+    
+    def _get_authenticated_url(self, repo_url: str, token: str) -> str:
+        """Convert GitHub URL to use token authentication"""
+        if repo_url.startswith('https://github.com/'):
+            # Convert https://github.com/owner/repo.git to https://token@github.com/owner/repo.git
+            return repo_url.replace('https://github.com/', f'https://{token}@github.com/')
+        return repo_url
         
     def initialize_repo(self) -> Tuple[bool, str]:
         """Clone repository if not exists, or validate existing repo"""
@@ -34,12 +45,12 @@ class RepositoryManager:
                     logger.warning(f"Invalid git repo at {self.repo_dir}, removing and cloning fresh")
                     shutil.rmtree(self.repo_dir)
             
-            # Clone fresh repository
+            # Clone fresh repository using authenticated URL
             logger.info(f"Cloning repository {self.repo_url} to {self.repo_dir}")
             self.repo_dir.parent.mkdir(parents=True, exist_ok=True)
             
             result = subprocess.run(
-                ['git', 'clone', self.repo_url, str(self.repo_dir)],
+                ['git', 'clone', self.auth_repo_url, str(self.repo_dir)],
                 capture_output=True,
                 text=True,
                 timeout=300
@@ -47,6 +58,14 @@ class RepositoryManager:
             
             if result.returncode == 0:
                 logger.info("Repository cloned successfully")
+                
+                # Set remote URL to use authenticated URL for pushes
+                subprocess.run(
+                    ['git', 'remote', 'set-url', 'origin', self.auth_repo_url],
+                    cwd=self.repo_dir,
+                    capture_output=True
+                )
+                
                 return True, "Repository initialized"
             else:
                 logger.error(f"Failed to clone repository: {result.stderr}")
@@ -61,6 +80,13 @@ class RepositoryManager:
     def _update_repo(self) -> Tuple[bool, str]:
         """Fetch latest changes from remote"""
         try:
+            # Ensure remote URL uses authentication
+            subprocess.run(
+                ['git', 'remote', 'set-url', 'origin', self.auth_repo_url],
+                cwd=self.repo_dir,
+                capture_output=True
+            )
+            
             # Ensure we're on main branch
             subprocess.run(['git', 'checkout', 'main'], cwd=self.repo_dir, check=True, capture_output=True)
             
