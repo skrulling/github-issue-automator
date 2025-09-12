@@ -41,8 +41,13 @@ def process_new_issues():
         
         logger.info(f"Found {len(unprocessed_issues)} unprocessed issues")
         
-        # Process each unprocessed issue
+        # Process each unprocessed issue that should be retried
         for issue in unprocessed_issues:
+            # Check if this issue should be retried based on backoff
+            if not issue_tracker.should_retry_issue(issue.number):
+                logger.info(f"Skipping issue #{issue.number} (still in backoff period)")
+                continue
+                
             logger.info(f"Processing issue #{issue.number}: {issue.title}")
             
             # Try to add comment to issue indicating we're working on it (optional)
@@ -84,6 +89,10 @@ def process_new_issues():
                     logger.warning(f"Could not close issue #{issue.number}: {e}")
                     logger.info("Issue was processed successfully but remains open due to permissions")
                 
+                # Mark as processed only on success
+                issue_tracker.mark_processed(issue.number)
+                logger.info(f"Issue #{issue.number} marked as processed")
+                
             else:
                 logger.error(f"Failed to process issue #{issue.number}: {message}")
                 
@@ -95,9 +104,9 @@ def process_new_issues():
                     )
                 except Exception as e:
                     logger.warning(f"Could not add failure comment to issue #{issue.number}: {e}")
-            
-            # Mark as processed regardless of success/failure
-            issue_tracker.mark_processed(issue.number)
+                
+                # Mark as failed with exponential backoff
+                issue_tracker.mark_failed(issue.number)
         
         # Cleanup
         claude_executor.cleanup()
