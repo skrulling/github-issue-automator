@@ -45,11 +45,15 @@ def process_new_issues():
         for issue in unprocessed_issues:
             logger.info(f"Processing issue #{issue.number}: {issue.title}")
             
-            # Add comment to issue indicating we're working on it
-            github_client.add_comment(
-                issue.number,
-                "🤖 Automated fix in progress. Claude Code is analyzing this issue..."
-            )
+            # Try to add comment to issue indicating we're working on it (optional)
+            try:
+                github_client.add_comment(
+                    issue.number,
+                    "🤖 Automated fix in progress. Claude Code is analyzing this issue..."
+                )
+            except Exception as e:
+                logger.warning(f"Could not add start comment to issue #{issue.number}: {e}")
+                logger.info("Continuing with issue processing despite comment failure")
             
             # Execute Claude Code to fix the issue
             success, message = claude_executor.execute_issue_fix(
@@ -62,25 +66,35 @@ def process_new_issues():
             if success:
                 logger.info(f"Successfully processed issue #{issue.number}")
                 
-                # Add success comment and close issue
-                github_client.add_comment(
-                    issue.number,
-                    f"✅ Automated fix completed! {message}"
-                )
+                # Try to add success comment and close issue (optional)
+                try:
+                    github_client.add_comment(
+                        issue.number,
+                        f"✅ Automated fix completed! {message}"
+                    )
+                except Exception as e:
+                    logger.warning(f"Could not add success comment to issue #{issue.number}: {e}")
                 
-                github_client.close_issue(
-                    issue.number,
-                    "🤖 Issue automatically resolved by Claude Code automation."
-                )
+                try:
+                    github_client.close_issue(
+                        issue.number,
+                        "🤖 Issue automatically resolved by Claude Code automation."
+                    )
+                except Exception as e:
+                    logger.warning(f"Could not close issue #{issue.number}: {e}")
+                    logger.info("Issue was processed successfully but remains open due to permissions")
                 
             else:
                 logger.error(f"Failed to process issue #{issue.number}: {message}")
                 
-                # Add failure comment
-                github_client.add_comment(
-                    issue.number,
-                    f"❌ Automated fix failed: {message}\n\nPlease review and fix manually."
-                )
+                # Try to add failure comment (optional)
+                try:
+                    github_client.add_comment(
+                        issue.number,
+                        f"❌ Automated fix failed: {message}\n\nPlease review and fix manually."
+                    )
+                except Exception as e:
+                    logger.warning(f"Could not add failure comment to issue #{issue.number}: {e}")
             
             # Mark as processed regardless of success/failure
             issue_tracker.mark_processed(issue.number)
@@ -96,12 +110,10 @@ def check_claude_authentication():
     logger = logging.getLogger(__name__)
     
     try:
-        # Test authentication by running a simple headless command with all required tools
+        # Test authentication by running a simple headless command
         result = subprocess.run([
             'claude', '--print', 'Hello, this is an authentication test.',
-            '--output-format', 'json',
-            '--allowedTools', 'Bash,Read,Edit,Write,MultiEdit,Glob,Grep,WebFetch,WebSearch',
-            '--permission-mode', 'acceptAll'
+            '--output-format', 'json'
         ], capture_output=True, text=True, timeout=30)
         
         if result.returncode == 0:

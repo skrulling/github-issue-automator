@@ -200,8 +200,7 @@ Your goal is to deliver production-quality code that seamlessly integrates with 
                 'claude', 
                 '--print', prompt,
                 '--output-format', 'json',
-                '--allowedTools', 'Bash,Read,Edit,Write,MultiEdit,Glob,Grep,WebFetch,WebSearch',
-                '--permission-mode', 'acceptAll',
+                '--allowedTools', 'Bash', 'Read', 'Edit', 'Write', 'MultiEdit', 'Glob', 'Grep', 'WebFetch', 'WebSearch',
                 '--append-system-prompt', system_prompt
             ]
             
