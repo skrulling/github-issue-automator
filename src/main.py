@@ -96,69 +96,57 @@ def process_new_issues():
         logger.error(f"Error in process_new_issues: {e}")
 
 def check_claude_authentication():
-    """Check if Claude Code is authenticated, attempt login if not"""
+    """Check if Claude Code is authenticated using headless mode"""
     logger = logging.getLogger(__name__)
     
     try:
-        # First check if already authenticated
-        result = subprocess.run(['claude', 'auth', 'status'], 
-                              capture_output=True, text=True, timeout=30)
+        # Test authentication by running a simple headless command
+        result = subprocess.run([
+            'claude', '--print', 'Hello, this is a test to check authentication.',
+            '--output-format', 'json'
+        ], capture_output=True, text=True, timeout=30)
         
         if result.returncode == 0:
-            logger.info("✅ Claude Code is already authenticated")
+            logger.info("✅ Claude Code is authenticated and working in headless mode")
             return True
         else:
-            logger.info("❌ Claude Code not authenticated, attempting login...")
-            
-            # Use expect script to handle Claude interactive authentication
-            logger.info("🔗 Starting Claude Code authentication using expect script...")
-            logger.info("📋 Please check the logs below for the authentication URL")
-            logger.info("=" * 60)
-            
-            try:
-                # Run the expect script
-                result = subprocess.run(
-                    ['./claude_login.expect'],
-                    capture_output=True,
-                    text=True,
-                    timeout=120,
-                    cwd='/app'
-                )
+            # Check if it's an authentication error
+            error_output = result.stderr.lower()
+            if 'auth' in error_output or 'login' in error_output or 'unauthenticated' in error_output:
+                logger.info("❌ Claude Code not authenticated, providing authentication instructions...")
                 
-                # Log all output from expect script
-                if result.stdout:
-                    for line in result.stdout.split('\n'):
-                        if line.strip():
-                            logger.info(f"CLAUDE AUTH: {line}")
+                # Provide clear authentication instructions
+                logger.info("=" * 60)
+                logger.info("🔐 CLAUDE CODE AUTHENTICATION REQUIRED")
+                logger.info("=" * 60)
+                logger.info("To authenticate Claude Code in Railway:")
+                logger.info("")
+                logger.info("1. 🚀 Use Railway CLI to access shell:")
+                logger.info("   railway shell")
+                logger.info("")
+                logger.info("2. 🔑 Run authentication in the shell:")
+                logger.info("   claude")
+                logger.info("   /login")
+                logger.info("")
+                logger.info("3. 📋 Copy the authentication URL and open in browser")
+                logger.info("4. 🔄 Restart this Railway service after authentication")
+                logger.info("")
+                logger.info("💡 Alternative: Check Railway dashboard for 'Shell' or 'Console' tab")
+                logger.info("=" * 60)
                 
-                if result.stderr:
-                    for line in result.stderr.split('\n'):
-                        if line.strip():
-                            logger.info(f"CLAUDE AUTH ERROR: {line}")
-                
-                # Check return code
-                if result.returncode == 0:
-                    logger.info("✅ Claude Code authentication completed successfully!")
-                    return True
-                else:
-                    logger.error(f"❌ Claude Code authentication failed with exit code: {result.returncode}")
-                    return False
-                    
-            except subprocess.TimeoutExpired:
-                logger.error("⏰ Claude authentication script timed out")
                 return False
-            except Exception as e:
-                logger.error(f"❌ Error running authentication script: {e}")
+            else:
+                logger.error(f"❌ Claude Code error (not authentication): {result.stderr}")
                 return False
                 
     except subprocess.TimeoutExpired:
-        logger.error("⏰ Claude Code authentication timed out")
+        logger.error("⏰ Claude Code authentication check timed out")
         return False
     except FileNotFoundError:
         logger.error("❌ Claude Code CLI not found. Please install it first.")
         return False
     except Exception as e:
-        logger.error(f"❌ Error during Claude Code authentication: {e}")
+        logger.error(f"❌ Error checking Claude Code authentication: {e}")
         return False
 
 def main():

@@ -3,6 +3,7 @@ import subprocess
 import logging
 import tempfile
 import shutil
+import json
 from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -107,28 +108,48 @@ Please:
 Make sure to commit all changes when you're done."""
     
     def _run_claude_code(self, repo_path: str, prompt: str) -> Tuple[bool, str]:
-        """Execute Claude Code with the fix prompt"""
+        """Execute Claude Code using headless SDK"""
         try:
-            # Write prompt to temporary file
-            prompt_file = os.path.join(repo_path, '.claude_prompt.txt')
-            with open(prompt_file, 'w') as f:
-                f.write(prompt)
+            # Run Claude Code in headless mode with proper permissions
+            cmd = [
+                'claude', 
+                '--print', prompt,
+                '--output-format', 'json',
+                '--allowedTools', 'Bash,Read,Edit,Write,MultiEdit,Glob,Grep',
+                '--permission-mode', 'acceptEdits'
+            ]
             
-            # Run Claude Code in non-interactive mode
-            cmd = ['claude', 'code', '--non-interactive', '--prompt-file', '.claude_prompt.txt']
+            logger.info("Executing Claude Code in headless mode...")
             result = subprocess.run(cmd, cwd=repo_path, capture_output=True, text=True, timeout=1800)
             
-            # Clean up prompt file
-            os.remove(prompt_file)
-            
             if result.returncode == 0:
-                return True, "Claude Code executed successfully"
+                # Parse JSON response to get execution details
+                try:
+                    response_data = json.loads(result.stdout)
+                    
+                    # Log execution details
+                    if 'content' in response_data:
+                        logger.info(f"Claude Code response: {response_data['content'][:200]}...")
+                    
+                    if 'cost' in response_data:
+                        logger.info(f"Execution cost: {response_data['cost']}")
+                        
+                    return True, "Claude Code executed successfully"
+                    
+                except json.JSONDecodeError:
+                    # If not JSON, treat as success anyway
+                    logger.info("Claude Code executed successfully (non-JSON response)")
+                    return True, "Claude Code executed successfully"
             else:
-                return False, f"Claude Code failed: {result.stderr}"
+                error_msg = result.stderr or result.stdout
+                logger.error(f"Claude Code failed: {error_msg}")
+                return False, f"Claude Code failed: {error_msg}"
                 
         except subprocess.TimeoutExpired:
+            logger.error("Claude Code execution timed out")
             return False, "Claude Code execution timed out"
         except Exception as e:
+            logger.error(f"Error executing Claude Code: {e}")
             return False, str(e)
     
     def _create_pr(self, repo_path: str, branch_name: str, issue_number: int, issue_title: str) -> Tuple[bool, str]:

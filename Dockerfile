@@ -6,7 +6,6 @@ RUN apt-get update && apt-get install -y \
     curl \
     wget \
     unzip \
-    expect \
     && rm -rf /var/lib/apt/lists/*
 
 # Install GitHub CLI
@@ -35,13 +34,9 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code and scripts
+# Copy source code
 COPY src/ ./src/
-COPY claude_login.expect ./
 COPY .env* ./
-
-# Make expect script executable
-RUN chmod +x claude_login.expect
 
 # Create logs directory
 RUN mkdir -p logs
