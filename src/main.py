@@ -100,10 +100,12 @@ def check_claude_authentication():
     logger = logging.getLogger(__name__)
     
     try:
-        # Test authentication by running a simple headless command
+        # Test authentication by running a simple headless command with all required tools
         result = subprocess.run([
-            'claude', '--print', 'Hello, this is a test to check authentication.',
-            '--output-format', 'json'
+            'claude', '--print', 'Hello, this is an authentication test.',
+            '--output-format', 'json',
+            '--allowedTools', 'Bash,Read,Edit,Write,MultiEdit,Glob,Grep,WebFetch,WebSearch',
+            '--permission-mode', 'acceptAll'
         ], capture_output=True, text=True, timeout=30)
         
         if result.returncode == 0:

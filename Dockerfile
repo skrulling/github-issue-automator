@@ -44,5 +44,9 @@ RUN mkdir -p logs
 # Set environment variables
 ENV PYTHONPATH=/app
 
+# Configure git for Claude Code operations
+RUN git config --global user.email "claude-automator@noreply.com" && \
+    git config --global user.name "Claude Automator"
+
 # Run the application
 CMD ["python", "src/main.py"]

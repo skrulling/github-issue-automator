@@ -92,31 +92,46 @@ class ClaudeExecutor:
             return False, str(e)
     
     def _build_fix_prompt(self, issue_number: int, issue_title: str, issue_body: str) -> str:
-        """Build prompt for Claude Code"""
-        return f"""Please help fix GitHub issue #{issue_number}: {issue_title}
+        """Build comprehensive prompt for Claude Code with full development capabilities"""
+        return f"""You are working on fixing GitHub issue #{issue_number}: {issue_title}
 
 Issue description:
 {issue_body}
 
-Please:
-1. Analyze the issue and understand what needs to be fixed
-2. Implement the necessary changes
-3. Make sure the code follows best practices
-4. Run any tests if available
-5. Commit your changes with a descriptive message
+You have full access to all development tools needed for Next.js projects. Please:
 
-Make sure to commit all changes when you're done."""
+1. **Analyze the codebase**: Read relevant files to understand the project structure and identify the issue
+2. **Install dependencies**: Use npm/yarn to install any required packages if needed
+3. **Implement the fix**: Make necessary code changes following Next.js and React best practices
+4. **Test your changes**: Run tests, linting, or type checking if available
+5. **Commit your work**: Create meaningful commits with descriptive messages
+6. **Handle edge cases**: Consider error handling, TypeScript types, and accessibility
+
+Available tools you can use:
+- Bash: Run any command including git, npm, yarn, tests, builds
+- Read/Edit/Write: Work with files and make changes
+- Glob/Grep: Search through the codebase
+- WebFetch/WebSearch: Look up documentation or examples if needed
+
+Project context:
+- This appears to be a Next.js project
+- Follow existing code patterns and conventions
+- Ensure TypeScript compatibility if applicable
+- Consider responsive design and accessibility
+- Test your changes before committing
+
+Complete the issue fix and commit all changes with a clear commit message referencing issue #{issue_number}."""
     
     def _run_claude_code(self, repo_path: str, prompt: str) -> Tuple[bool, str]:
         """Execute Claude Code using headless SDK"""
         try:
-            # Run Claude Code in headless mode with proper permissions
+            # Run Claude Code in headless mode with comprehensive permissions for Next.js development
             cmd = [
                 'claude', 
                 '--print', prompt,
                 '--output-format', 'json',
-                '--allowedTools', 'Bash,Read,Edit,Write,MultiEdit,Glob,Grep',
-                '--permission-mode', 'acceptEdits'
+                '--allowedTools', 'Bash,Read,Edit,Write,MultiEdit,Glob,Grep,WebFetch,WebSearch',
+                '--permission-mode', 'acceptAll'
             ]
             
             logger.info("Executing Claude Code in headless mode...")
