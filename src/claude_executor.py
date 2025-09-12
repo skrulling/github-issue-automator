@@ -92,46 +92,117 @@ class ClaudeExecutor:
             return False, str(e)
     
     def _build_fix_prompt(self, issue_number: int, issue_title: str, issue_body: str) -> str:
-        """Build comprehensive prompt for Claude Code with full development capabilities"""
-        return f"""You are working on fixing GitHub issue #{issue_number}: {issue_title}
+        """Build intelligent system prompt for Claude Code with comprehensive project analysis"""
+        return f"""You are an expert software engineer working on GitHub issue #{issue_number}: {issue_title}
 
-Issue description:
+## Issue Details
 {issue_body}
 
-You have full access to all development tools needed for Next.js projects. Please:
+## Your Mission
+Fix this issue by following a systematic, intelligent approach. You have full access to all development tools and should work autonomously.
 
-1. **Analyze the codebase**: Read relevant files to understand the project structure and identify the issue
-2. **Install dependencies**: Use npm/yarn to install any required packages if needed
-3. **Implement the fix**: Make necessary code changes following Next.js and React best practices
-4. **Test your changes**: Run tests, linting, or type checking if available
-5. **Commit your work**: Create meaningful commits with descriptive messages
-6. **Handle edge cases**: Consider error handling, TypeScript types, and accessibility
+## Step 1: Project Discovery & Context Analysis
+Before making any changes, thoroughly understand the project:
 
-Available tools you can use:
-- Bash: Run any command including git, npm, yarn, tests, builds
-- Read/Edit/Write: Work with files and make changes
-- Glob/Grep: Search through the codebase
-- WebFetch/WebSearch: Look up documentation or examples if needed
+1. **Project Structure Analysis**:
+   - Read package.json to understand the tech stack, scripts, and dependencies
+   - Check README.md for project documentation and setup instructions
+   - Examine .gitignore, tsconfig.json, next.config.js for configuration
+   - Look for documentation in docs/ or similar folders
 
-Project context:
-- This appears to be a Next.js project
-- Follow existing code patterns and conventions
-- Ensure TypeScript compatibility if applicable
-- Consider responsive design and accessibility
-- Test your changes before committing
+2. **Codebase Architecture**:
+   - Explore the src/ or app/ directory structure
+   - Identify routing patterns (pages/ vs app/ directory)
+   - Find component patterns and naming conventions
+   - Check for state management (Redux, Zustand, Context, etc.)
+   - Look for styling approach (CSS modules, Tailwind, styled-components, etc.)
 
-Complete the issue fix and commit all changes with a clear commit message referencing issue #{issue_number}."""
+3. **Related Code Discovery**:
+   - Use Grep to search for keywords from the issue across the codebase
+   - Find similar components or features that might be affected
+   - Locate test files related to the issue area
+   - Check for existing error handling patterns
+
+## Step 2: Contextual Research
+4. **External Research** (when needed):
+   - Use WebSearch for Next.js best practices related to the issue
+   - Look up documentation for any unfamiliar libraries or APIs
+   - Research similar problems and solutions in the community
+
+## Step 3: Implementation Strategy
+5. **Plan Before Coding**:
+   - Identify all files that need modification
+   - Consider backward compatibility and breaking changes
+   - Plan for proper TypeScript types if applicable
+   - Think about responsive design and accessibility implications
+
+6. **Smart Implementation**:
+   - Follow the project's existing patterns and conventions exactly
+   - Match the coding style, naming conventions, and file organization
+   - Use the same libraries and approaches already in the project
+   - Ensure consistency with existing error handling and validation
+
+## Step 4: Quality Assurance
+7. **Comprehensive Testing**:
+   - Run existing tests: npm test, npm run test:unit, yarn test, etc.
+   - Run linting: npm run lint, yarn lint, etc.
+   - Run type checking: npm run type-check, tsc --noEmit, etc.
+   - Try building the project: npm run build, yarn build, etc.
+   - Test the actual functionality you implemented
+
+8. **Code Review Yourself**:
+   - Double-check your changes for potential issues
+   - Ensure no console.log or debug code remains
+   - Verify proper error boundaries and edge cases
+   - Check for accessibility compliance (ARIA labels, keyboard navigation, etc.)
+
+## Step 5: Professional Delivery
+9. **Clean Commit**:
+   - Stage only the necessary files
+   - Write a clear, descriptive commit message
+   - Include the issue number in your commit: "fix: resolve issue #{issue_number} - [brief description]"
+
+## Available Tools:
+- **Bash**: Run any command (git, npm, yarn, tests, builds, etc.)
+- **Read/Edit/Write/MultiEdit**: File operations
+- **Glob/Grep**: Search and discovery
+- **WebFetch/WebSearch**: Research and documentation lookup
+
+## Success Criteria:
+- Issue is completely resolved
+- All existing tests pass
+- Code follows project conventions
+- No breaking changes unless explicitly required
+- Proper TypeScript types (if applicable)
+- Accessible and responsive (for UI changes)
+- Clean, professional commit
+
+Start by exploring the project structure and understanding the codebase before making any changes. Be methodical, thorough, and professional in your approach."""
     
     def _run_claude_code(self, repo_path: str, prompt: str) -> Tuple[bool, str]:
         """Execute Claude Code using headless SDK"""
         try:
+            # Create enhanced system prompt
+            system_prompt = """You are an expert software engineer specializing in Next.js, React, and TypeScript. 
+
+Key principles:
+- Always explore and understand the project structure before making changes
+- Follow existing code patterns, naming conventions, and architectural decisions
+- Research best practices when implementing new features
+- Test thoroughly and ensure backward compatibility
+- Write clean, maintainable code with proper error handling
+- Consider accessibility and responsive design for UI changes
+
+Your goal is to deliver production-quality code that seamlessly integrates with the existing project."""
+
             # Run Claude Code in headless mode with comprehensive permissions for Next.js development
             cmd = [
                 'claude', 
                 '--print', prompt,
                 '--output-format', 'json',
                 '--allowedTools', 'Bash,Read,Edit,Write,MultiEdit,Glob,Grep,WebFetch,WebSearch',
-                '--permission-mode', 'acceptAll'
+                '--permission-mode', 'acceptAll',
+                '--append-system-prompt', system_prompt
             ]
             
             logger.info("Executing Claude Code in headless mode...")
