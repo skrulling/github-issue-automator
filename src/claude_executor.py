@@ -172,7 +172,8 @@ Your goal is to deliver production-quality code that seamlessly integrates with 
             ]
             
             logger.info("Executing Claude Code in headless mode...")
-            result = subprocess.run(cmd, cwd=repo_path, capture_output=True, text=True, timeout=1800)
+            logger.debug(f"Claude command: {' '.join(cmd)} (cwd={repo_path})")
+            result = subprocess.run(cmd, cwd=repo_path, capture_output=True, text=True)
             
             if result.returncode == 0:
                 # Parse JSON response to get execution details
